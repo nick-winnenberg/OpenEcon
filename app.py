@@ -109,6 +109,27 @@ if gini_change > 0.5:
 elif gini_change < -0.5:
     gini_stablity = "Decreasing"
 
+    # World Bank Gini Index Comparison
+    countries = ['USA', 'CAN', 'GBR', 'DEU', 'FRA', 'JPN', 'CHN', 'BRA', 'IND']
+    wb_gini_df = pd.DataFrame()
+
+    for country in countries:
+        try:
+            df = pdr.DataReader(f'GINI.{country}', 'wb', start, end)
+            df = df.reset_index()
+            df['Country'] = country
+            wb_gini_df = pd.concat([wb_gini_df, df[['date', f'GINI.{country}', 'Country']]], ignore_index=True)
+        except Exception:
+            continue
+
+    wb_gini_df = wb_gini_df.rename(columns={'date': 'Year', f'GINI.{country}': 'Gini Index'})
+    st.subheader("Global Gini Index Comparison")
+    st.write("Source: World Bank")
+    st.write("Compare income inequality (Gini Index) across major economies.")
+    st.line_chart(wb_gini_df, x="Year", y="Gini Index", color="Country")
+
+
+
 #Visualizations
 
 st.header("Welcome to the OpenEcon Dashboard")
