@@ -113,6 +113,27 @@ elif gini_change < -0.5:
 
 st.header("Welcome to the OpenEcon Dashboard")
 st.write("This uses public data to provide unbiased insights into the US economy.")
+info_table = pd.DataFrame({
+    "Indicator": [
+        "Staffing Ratio",
+        "Labor Force Stability",
+        "Inflation Level",
+        "Income Inequality",
+        "Recession Risk",
+        "Deficit Spending"
+    ],
+    "Value": [
+        staffing_ratio_health,
+        labor_force_stability,
+        inflation_level,
+        gini_stablity,
+        recession_risk,
+        defecit_spending
+    ]
+})
+
+st.subheader("Summary Table")
+st.dataframe(info_table, use_container_width=True)
 
 st.subheader("Workforce Insights",divider=True)
 st.subheader("Open Positions and Unemployed Americans")
