@@ -1,6 +1,5 @@
 import pandas as pd
 import pandas_datareader as pdr
-import matplotlib.pylab as plt
 import datetime
 import streamlit as st
 
@@ -67,6 +66,29 @@ elif cpi_change < 1:
 elif cpi_change < 0:
     inflation_level = "Deflation"
 
+ppi_df = pdr.DataReader('PPIACO', 'fred', start, end) #Producer Price Index - Monthly
+ppi_df.rename(columns={"PPIACO":"PPI"}, inplace=True)
+ppi_df = ppi_df.reset_index()
+
+ppi_last = ppi_df.iloc[-1]["PPI"]
+ppi_last_year = ppi_df.iloc[-12]["PPI"]
+ppi_change = ((ppi_last - ppi_last_year) / ppi_last_year) * 100
+
+ppi_inflation_level = "Low"
+
+if ppi_change > 5:
+    ppi_inflation_level = "Very High"
+elif ppi_change > 3:
+    ppi_inflation_level = "High"
+elif ppi_change > 2:
+    ppi_inflation_level = "Medium"
+elif ppi_change > 1:
+    ppi_inflation_level= "Low"
+elif ppi_change < 1:
+    ppi_inflation_level = "Very Low"
+elif ppi_change < 0:
+    ppi_inflation_level= "Deflation"
+
 
 #GDP Data
 gdp_df = pdr.DataReader('GDP', 'fred', start, end) #Gross Domestic Product - Quarterly
@@ -109,27 +131,6 @@ if gini_change > 0.5:
 elif gini_change < -0.5:
     gini_stablity = "Decreasing"
 
-    # World Bank Gini Index Comparison
-    countries = ['USA', 'CAN', 'GBR', 'DEU', 'FRA', 'JPN', 'CHN', 'BRA', 'IND']
-    wb_gini_df = pd.DataFrame()
-
-    for country in countries:
-        try:
-            df = pdr.DataReader(f'GINI.{country}', 'wb', start, end)
-            df = df.reset_index()
-            df['Country'] = country
-            wb_gini_df = pd.concat([wb_gini_df, df[['date', f'GINI.{country}', 'Country']]], ignore_index=True)
-        except Exception:
-            continue
-
-    wb_gini_df = wb_gini_df.rename(columns={'date': 'Year', f'GINI.{country}': 'Gini Index'})
-    st.subheader("Global Gini Index Comparison")
-    st.write("Source: World Bank")
-    st.write("Compare income inequality (Gini Index) across major economies.")
-    st.line_chart(wb_gini_df, x="Year", y="Gini Index", color="Country")
-
-
-
 #Visualizations
 
 st.header("Welcome to the OpenEcon Dashboard")
@@ -152,10 +153,11 @@ info_table = pd.DataFrame({
         defecit_spending
     ]
 })
-
+## Summary Table
 st.subheader("Summary Table")
 st.dataframe(info_table, use_container_width=True)
 
+## Workforce Insights
 st.subheader("Workforce Insights",divider=True)
 st.subheader("Open Positions and Unemployed Americans")
 st.write("Source: FRED (Federal Reserve Economic Data)")
@@ -181,7 +183,7 @@ st.line_chart(labor_force_df,x="DATE",y="Labor Force Participation Rate",y_label
 col1.metric("Current Labor Force Participation Rate", f"{labor_force_last:.2f}%",help=f"The current percentage of the working-age population that is either employed or actively seeking employment. The labor force participation rate is currently {labor_force_stability}.")
 col2.metric("Labor Force Stablity",f'{labor_force_stability}',help="Indicates whether the labor force participation rate is increasing, decreasing, or stable based on the change over the last year.")
 
-
+## Inflation Insights
 st.subheader("Inflation Insights",divider=True)
 st.subheader("Consumer Price Index (CPI)")
 st.write("Source: FRED (Federal Reserve Economic Data)")
@@ -191,6 +193,15 @@ col1.metric("Annualized Inflation", f"{cpi_change:.2f}%")
 col2.metric("Current Inflation Level", inflation_level,help="Inflation level based on the annualized change in CPI over the last year. Very High (>5%), High (3-5%), Medium (2-3%), Low (1-2%), Very Low (<1%), Deflation (<0%).")
 st.line_chart(cpi_df,x="DATE",y="CPI")
 
+st.subheader("Producer Price Index (PPI)")
+st.write("Source: FRED (Federal Reserve Economic Data)")
+st.write("The Producer Price Index (PPI) measures the average change over time in the selling prices received by domestic producers for their output. It is an important indicator of inflation at the wholesale level.")
+col1, col2 = st.columns(2)
+col1.metric("Annualized PPI Inflation", f"{ppi_change:.2f}%")
+col2.metric("PPI Inflation Level", ppi_inflation_level,help="PPI inflation level based on the annualized change in PPI over the last year. Very High (>5%), High (3-5%), Medium (2-3%), Low (1-2%), Very Low (<1%), Deflation (<0%).")
+st.line_chart(ppi_df,x="DATE",y="PPI")
+
+## Income Inequality Insights
 st.subheader("Gini Index")
 st.write("Source: FRED (Federal Reserve Economic Data)")
 st.write("The Gini Index measures income inequality within a population, ranging from 0 (perfect equality) to 100 (perfect inequality). It provides insights into the distribution of income and wealth in the US.")
@@ -200,7 +211,7 @@ col2.metric("Income Inequality", gini_stablity,help="Indicates whether income in
 st.line_chart(gini_df,x="DATE",y="Gini Index")
 
 
-
+## Economic Growth Insights
 st.subheader("Economic Growth Insights",divider=True)
 st.subheader("Gross Domestic Product (GDP)")
 st.write("Source: FRED (Federal Reserve Economic Data)")
