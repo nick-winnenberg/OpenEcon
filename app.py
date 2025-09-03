@@ -131,6 +131,22 @@ if gini_change > 0.5:
 elif gini_change < -0.5:
     gini_stablity = "Decreasing"
 
+#Fertility Rate
+fertility_df = pdr.DataReader('SPDYNTFRTINUSA', 'fred', start, end) #Fertility Rate - Annual
+fertility_df.rename(columns={"SPDYNTFRTINUSA":"Fertility Rate"}, inplace=True)
+fertility_df = fertility_df.reset_index()
+fertility_last = fertility_df.iloc[-1]["Fertility Rate"]
+fertility_last_year = fertility_df.iloc[-2]["Fertility Rate"]
+fertility_change = fertility_last - fertility_last_year
+
+if fertility_last < 1.7:
+    fertility_trend = "Below Replacement"
+elif fertility_last < 2.1:
+    fertility_trend = "At Replacement"
+else:
+    fertility_trend = "Above Replacement"
+
+
 #Visualizations
 
 st.header("Welcome to the OpenEcon Dashboard")
@@ -142,7 +158,8 @@ info_table = pd.DataFrame({
         "Inflation Level",
         "Income Inequality",
         "Recession Risk",
-        "Deficit Spending"
+        "Deficit Spending",
+        "Fertility Trend"
     ],
     "Value": [
         staffing_ratio_health,
@@ -150,7 +167,8 @@ info_table = pd.DataFrame({
         inflation_level,
         gini_stablity,
         recession_risk,
-        defecit_spending
+        defecit_spending,
+        fertility_trend
     ]
 })
 ## Summary Table
@@ -229,3 +247,13 @@ col1.metric("Annual Change in National Debt Spending", f"{debt_change:.2f}%")
 col2.metric("Deficit Spending", defecit_spending,help="Indicates whether the national debt is increasing or decreasing based on the change in national debt over the last year.")
 st.line_chart(debt_df,x="DATE",y="National Debt or Surplus",y_label="National Surpluss (or Debt) in Millions")
 
+#Population Insights
+st.subheader("Population Insights",divider=True)
+st.subheader("Fertility Rate")
+st.write("Source: FRED (Federal Reserve Economic Data)")
+st.write("The fertility rate measures the average number of children born per Couple. It provides insights into population growth and demographic trends in the US.")
+col1, col2, col3 = st.columns(3)
+col1.metric("Current Fertility Rate", f"{fertility_last:.2f}",help="The average number of children born per Couple in the US.")
+col2.metric("Fertility Rate Change", f"{fertility_change:.2f}",help="Change in the fertility rate over the last year.")
+col3.metric("Fertility Trend", fertility_trend,help="Indicates whether the fertility rate is below, at, or above the replacement level of 2.1 births per couple.")
+st.line_chart(fertility_df,x="DATE",y="Fertility Rate",y_label="Fertility Rate (Births per Couple)")     
