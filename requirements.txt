@@ -3,3 +3,4 @@ pandas_datareader
 matplotlib
 datetime
 pandas
+distutils
