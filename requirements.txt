@@ -1,5 +1,5 @@
 streamlit
-pandas_datareader
+fredapi
+yfinance
 matplotlib
-datetime
 pandas

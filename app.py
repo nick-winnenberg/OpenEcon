@@ -1,7 +1,15 @@
 import pandas as pd
-import pandas_datareader as pdr
+from fredapi import Fred
 import datetime
 import streamlit as st
+import os
+
+# Initialize FRED API
+# ⚠️ WARNING: Hardcoded API key below - not recommended for production!
+# Get a free API key from https://fred.stlouisfed.org/docs/api/api_key.html
+api_key = "f4b346dd503b2f6f02ff05ce945204d6"  # Replace with your actual FRED API key
+
+fred = Fred(api_key=api_key)
 
 ## Sidebar for user input
 st.sidebar.header("Select Timeframe")
@@ -12,14 +20,28 @@ end_date = st.sidebar.date_input("End date", datetime.date(2025, 6, 1))
 start = datetime.datetime.combine(start_date, datetime.time.min)
 end = datetime.datetime.combine(end_date, datetime.time.min)
 
+# Function to safely fetch data with error handling
+@st.cache_data
+def fetch_fred_data(series_id, start_date, end_date):
+    try:
+        return fred.get_series(series_id, start=start_date, end=end_date).reset_index()
+    except Exception as e:
+        st.error(f"Error fetching {series_id}: {str(e)}")
+        return None
+
 # Pull Data
 #Staffing Levels
-unemploy_pop_df = pdr.DataReader('UNEMPLOY', 'fred', start, end) #Unemployed Level - Monthly
-open_positions_df = pdr.DataReader('JTSJOL', 'fred', start, end) #Open Positions - Monthly
-unemploy_pop_df=unemploy_pop_df.reset_index()
-open_positions_df=open_positions_df.reset_index()
-staffing_level_df = pd.merge(unemploy_pop_df,open_positions_df,on="DATE",how="outer")
-staffing_level_df = staffing_level_df.rename(columns={"UNEMPLOY":"Unemployed Americans","JTSJOL":"Open Positions","DATE":"Month"})
+unemploy_pop_df = fetch_fred_data('UNEMPLOY', start, end) #Unemployed Level - Monthly
+open_positions_df = fetch_fred_data('JTSJOL', start, end) #Open Positions - Monthly
+
+if unemploy_pop_df is None or open_positions_df is None:
+    st.error("Unable to fetch employment data")
+    st.stop()
+
+unemploy_pop_df = unemploy_pop_df.rename(columns={0: 'UNEMPLOY'})
+open_positions_df = open_positions_df.rename(columns={0: 'JTSJOL'})
+staffing_level_df = pd.merge(unemploy_pop_df, open_positions_df, on="index", how="outer")
+staffing_level_df = staffing_level_df.rename(columns={"UNEMPLOY":"Unemployed Americans","JTSJOL":"Open Positions","index":"Month"})
 staffing_level_df.plot(x="Month", y=["Unemployed Americans","Open Positions"],ylabel="Americans")
 staffing_ratio_health = "Stable"
 
@@ -30,12 +52,14 @@ elif staffing_ratio_last < .75:
     staffing_ratio_health = "Employer Market"
 
 #Labor Force Participation Rate
-labor_force_df = pdr.DataReader('CIVPART', 'fred', start, end) #Labor Force Participation Rate - Monthly
-labor_force_df.rename(columns={"CIVPART":"Labor Force Participation Rate"}, inplace=True)
+labor_force_df = fetch_fred_data('CIVPART', start, end) #Labor Force Participation Rate - Monthly
+if labor_force_df is None:
+    st.error("Unable to fetch labor force data")
+    st.stop()
+labor_force_df.rename(columns={"index": "DATE", 0:"Labor Force Participation Rate"}, inplace=True)
 labor_force_last = labor_force_df.iloc[-1]["Labor Force Participation Rate"]
 labor_force_1yr_ago = labor_force_df.iloc[-12]["Labor Force Participation Rate"]
 labor_force_change = labor_force_last - labor_force_1yr_ago
-labor_force_df = labor_force_df.reset_index()
 
 labor_force_stability = "Stable"
 if labor_force_change > 0.5:
@@ -44,9 +68,11 @@ elif labor_force_change < -0.5:
     labor_force_stability = "Decreasing"
 
 #Inflation Data
-cpi_df = pdr.DataReader('CPIAUCNS', 'fred', start, end) #Consumer Price Index - Monthly
-cpi_df.rename(columns={"CPIAUCNS":"CPI"}, inplace=True)
-cpi_df = cpi_df.reset_index()
+cpi_df = fetch_fred_data('CPIAUCNS', start, end) #Consumer Price Index - Monthly
+if cpi_df is None:
+    st.error("Unable to fetch CPI data")
+    st.stop()
+cpi_df.rename(columns={"index": "DATE", 0:"CPI"}, inplace=True)
 
 cpi_last = cpi_df.iloc[-1]["CPI"]
 cpi_last_year = cpi_df.iloc[-12]["CPI"]
@@ -66,9 +92,11 @@ elif cpi_change < 1:
 elif cpi_change < 0:
     inflation_level = "Deflation"
 
-ppi_df = pdr.DataReader('PPIACO', 'fred', start, end) #Producer Price Index - Monthly
-ppi_df.rename(columns={"PPIACO":"PPI"}, inplace=True)
-ppi_df = ppi_df.reset_index()
+ppi_df = fetch_fred_data('PPIACO', start, end) #Producer Price Index - Monthly
+if ppi_df is None:
+    st.error("Unable to fetch PPI data")
+    st.stop()
+ppi_df.rename(columns={"index": "DATE", 0:"PPI"}, inplace=True)
 
 ppi_last = ppi_df.iloc[-1]["PPI"]
 ppi_last_year = ppi_df.iloc[-12]["PPI"]
@@ -91,8 +119,11 @@ elif ppi_change < 0:
 
 
 #GDP Data
-gdp_df = pdr.DataReader('GDP', 'fred', start, end) #Gross Domestic Product - Quarterly
-gdp_df = gdp_df.reset_index()
+gdp_df = fetch_fred_data('GDP', start, end) #Gross Domestic Product - Quarterly
+if gdp_df is None:
+    st.error("Unable to fetch GDP data")
+    st.stop()
+gdp_df.rename(columns={"index": "DATE", 0:"GDP"}, inplace=True)
 qtr_last = gdp_df.iloc[-1]["GDP"]
 qtr_2nd_last = gdp_df.iloc[-2]["GDP"]
 change_qtr = ((qtr_last - qtr_2nd_last) / qtr_2nd_last) * 100
@@ -106,9 +137,11 @@ elif change_qtr < 0 or change_qtr_2 < 0:
     recession_risk = "Medium"
 
 #National Debt
-debt_df = pdr.DataReader('FYFSD', 'fred', start, end) #Gross Domestic Product - Quarterly
-debt_df.rename(columns={"FYFSD":"National Debt or Surplus"}, inplace=True)
-debt_df = debt_df.reset_index()
+debt_df = fetch_fred_data('FYFSD', start, end) #Federal Deficit or Surplus - Annual
+if debt_df is None:
+    st.error("Unable to fetch debt data")
+    st.stop()
+debt_df.rename(columns={"index": "DATE", 0:"National Debt or Surplus"}, inplace=True)
 debt_last = debt_df.iloc[-1]["National Debt or Surplus"]
 debt_last_year = debt_df.iloc[-2]["National Debt or Surplus"]
 debt_change = ((debt_last - debt_last_year) / debt_last_year) * 100
@@ -118,9 +151,11 @@ if debt_change < 0:
     defecit_spending = "Decreasing"
 
 #Gini Index
-gini_df = pdr.DataReader('SIPOVGINIUSA', 'fred', start, end) #Gini Index - Annual
-gini_df.rename(columns={"SIPOVGINIUSA":"Gini Index"}, inplace=True)
-gini_df = gini_df.reset_index()
+gini_df = fetch_fred_data('SIPOVGINIUSA', start, end) #Gini Index - Annual
+if gini_df is None:
+    st.error("Unable to fetch Gini Index data")
+    st.stop()
+gini_df.rename(columns={"index": "DATE", 0:"Gini Index"}, inplace=True)
 gini_last = gini_df.iloc[-1]["Gini Index"]
 gini_last_year = gini_df.iloc[-2]["Gini Index"]
 gini_change = gini_last - gini_last_year
@@ -132,9 +167,11 @@ elif gini_change < -0.5:
     gini_stablity = "Decreasing"
 
 #Fertility Rate
-fertility_df = pdr.DataReader('SPDYNTFRTINUSA', 'fred', start, end) #Fertility Rate - Annual
-fertility_df.rename(columns={"SPDYNTFRTINUSA":"Fertility Rate"}, inplace=True)
-fertility_df = fertility_df.reset_index()
+fertility_df = fetch_fred_data('SPDYNTFRTINUSA', start, end) #Fertility Rate - Annual
+if fertility_df is None:
+    st.error("Unable to fetch fertility rate data")
+    st.stop()
+fertility_df.rename(columns={"index": "DATE", 0:"Fertility Rate"}, inplace=True)
 fertility_last = fertility_df.iloc[-1]["Fertility Rate"]
 fertility_last_year = fertility_df.iloc[-2]["Fertility Rate"]
 fertility_change = fertility_last - fertility_last_year
@@ -148,9 +185,11 @@ else:
 
 
 #Interest Rates
-interest_df = pdr.DataReader('FEDFUNDS', 'fred', start, end) #Federal Funds Rate - Monthly
-interest_df.rename(columns={"FEDFUNDS":"Interest Rate"}, inplace=True)
-interest_df = interest_df.reset_index()
+interest_df = fetch_fred_data('FEDFUNDS', start, end) #Federal Funds Rate - Monthly
+if interest_df is None:
+    st.error("Unable to fetch interest rate data")
+    st.stop()
+interest_df.rename(columns={"index": "DATE", 0:"Interest Rate"}, inplace=True)
 interest_last = interest_df.iloc[-1]["Interest Rate"]
 interest_last_year = interest_df.iloc[-12]["Interest Rate"]
 interest_change = ((interest_last - interest_last_year) / interest_last_year) * 100
