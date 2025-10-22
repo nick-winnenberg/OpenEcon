@@ -147,6 +147,21 @@ else:
     fertility_trend = "Above Replacement"
 
 
+#Interest Rates
+interest_df = pdr.DataReader('FEDFUNDS', 'fred', start, end) #Federal Funds Rate - Monthly
+interest_df.rename(columns={"FEDFUNDS":"Interest Rate"}, inplace=True)
+interest_df = interest_df.reset_index()
+interest_last = interest_df.iloc[-1]["Interest Rate"]
+interest_last_year = interest_df.iloc[-12]["Interest Rate"]
+interest_change = ((interest_last - interest_last_year) / interest_last_year) * 100
+
+if interest_change > 5:
+    interest_trend = "Rising"
+elif interest_change < -5:
+    interest_trend = "Falling"
+else:
+    interest_trend = "Stable"
+
 #Visualizations
 
 st.header("Welcome to the OpenEcon Dashboard")
@@ -159,7 +174,8 @@ info_table = pd.DataFrame({
         "Income Inequality",
         "Recession Risk",
         "Deficit Spending",
-        "Fertility Trend"
+        "Fertility Trend",
+        "Interest Rate Trend"
     ],
     "Value": [
         staffing_ratio_health,
@@ -168,7 +184,8 @@ info_table = pd.DataFrame({
         gini_stablity,
         recession_risk,
         defecit_spending,
-        fertility_trend
+        fertility_trend,
+        interest_trend
     ]
 })
 ## Summary Table
@@ -246,6 +263,13 @@ col1, col2 = st.columns(2)
 col1.metric("Annual Change in National Debt Spending", f"{debt_change:.2f}%")
 col2.metric("Deficit Spending", defecit_spending,help="Indicates whether the national debt is increasing or decreasing based on the change in national debt over the last year.")
 st.line_chart(debt_df,x="DATE",y="National Debt or Surplus",y_label="National Surpluss (or Debt) in Millions")
+st.subheader("Interest Rate Insights")
+st.write("Source: FRED (Federal Reserve Economic Data)")
+st.write("The federal funds rate is the interest rate at which depository institutions lend reserve balances to other depository institutions overnight. It is a key tool used by the Federal Reserve to influence monetary policy and economic activity.")
+col1, col2 = st.columns(2)
+col1.metric("Annual Change in Interest Rate", f"{interest_change:.2f}%")
+col2.metric("Interest Rate Trend", interest_trend,help="Indicates whether the interest rate is rising, falling, or stable based on the change over the last year.")
+st.line_chart(interest_df,x="DATE",y="Interest Rate",y_label="Interest Rate (%)")
 
 #Population Insights
 st.subheader("Population Insights",divider=True)
